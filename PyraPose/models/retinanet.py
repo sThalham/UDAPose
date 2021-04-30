@@ -410,6 +410,11 @@ def retinanet(
 
     # discriminator for feature map conditioned on predicted mask
     #mask_reshape = keras.layers.Reshape((60, 80, num_classes))(masks)
+    # discriminator conditioned on P3 feature classification
+    # domain = discriminator_head(features[0])
+
+    '''
+    # discriminator for feature map conditioned on predicted 3Dbox
     pointsP3, pointsP4, pointsP5 = tf.split(pyramids[0], num_or_size_splits=[43200, 10800, 2700], axis=1)
     pointsP3 = keras.layers.Reshape((60, 80, num_anchors * 16))(pointsP3)
     disc_P3 = keras.layers.Concatenate(axis=3)([features[0], pointsP3])
@@ -417,21 +422,18 @@ def retinanet(
     disc_P4 = keras.layers.Concatenate(axis=3)([features[1], pointsP4])
     pointsP5 = keras.layers.Reshape((15, 20, num_anchors * 16))(pointsP5)
     disc_P5 = keras.layers.Concatenate(axis=3)([features[2], pointsP5])
-
     domainP3 = discriminator_head(disc_P3)
     domainP4 = discriminator_head(disc_P4)
     domainP5 = discriminator_head(disc_P5)
     domain = keras.layers.Concatenate(axis=1, name='domain')([domainP3, domainP4, domainP5])
 
-    # discriminator conditioned on P3 feature classification
-    #domain = discriminator_head(features[0])
-
     pyramids.append(domain)
     pyramids.append(features[0])
     pyramids.append(features[1])
     pyramids.append(features[2])
+    '''
 
-    return keras.models.Model(inputs=inputs, outputs=pyramids, name=name), discriminator_head
+    return keras.models.Model(inputs=inputs, outputs=pyramids, name=name)#, discriminator_head
 
 
 def retinanet_bbox(

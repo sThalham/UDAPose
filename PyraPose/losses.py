@@ -194,7 +194,7 @@ def smooth_l1(sigma=3.0):
 
         loss = keras.backend.sum(regression_loss) / normalizer
 
-        return 5 * loss
+        return loss
 
     return _smooth_l1
 

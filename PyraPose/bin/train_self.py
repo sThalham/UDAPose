@@ -69,7 +69,10 @@ def makedirs(path):
 
 def model_with_weights(model, weights, skip_mismatch):
     if weights is not None:
-        model[0].load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
+        # plus discriminator
+        #model[0].load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
+        # w/o discriminator
+        model.load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
     return model
 
 
@@ -91,26 +94,30 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
             model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
         training_model = multi_gpu_model(model, gpus=multi_gpu)
     else:
-        model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+        # w/ disriminator
+        #model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights,skip_mismatch=True)
+        # w/o disriminator
+        model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
         training_model = model
 
     prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
 
-    gan = CustomModel(pyrapose=training_model, discriminator=discriminator_model)
+    #gan = CustomModel(pyrapose=training_model, discriminator=discriminator_model)
+    gan = CustomModel(pyrapose=training_model)
     #optimizer_adam = tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001)
     gan.compile(
         gen_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
-        dis_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
+        #dis_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
         gen_loss={
             '3Dbox'         : losses.orthogonal_l1(),
             'cls'           : losses.focal(),
             'mask'          : losses.focal(),
-            'domain'        : losses.focal(),
+            #'DR_diff'          : losses.smooth_l1(),
+            #'domain'        : losses.focal(),
             #'features'            : losses.smooth_l1(),
         },
-        dis_loss=losses.focal()
+        dis_loss={'DR_diff' : losses.smooth_l1()}
     )
-
     '''
     # make prediction model
     prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
@@ -131,7 +138,7 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
     )
 
     #discriminator_model = default_discriminator()
-    discriminator_model.compile(loss=losses.focal(), optimizer=optimizer)
+    #discriminator_model.compile(loss=losses.focal(), optimizer=optimizer)
 
     # For the combined model we will only train the generator
     #self.discriminator.trainable = False

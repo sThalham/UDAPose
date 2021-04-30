@@ -112,7 +112,7 @@ def anchor_targets_bbox(
     labels_batch      = np.zeros((batch_size, anchors.shape[0], num_classes + 1), dtype=keras.backend.floatx())
     regression_3D = np.zeros((batch_size, anchors.shape[0], 16 + 1), dtype=keras.backend.floatx())
     mask_batch = np.zeros((batch_size, 4800, num_classes + 1), dtype=keras.backend.floatx())
-    reconstruction_batch = np.zeros((batch_size, 60, 80, 3 + 1), dtype=keras.backend.floatx())
+    DR_diff_box = np.zeros((batch_size, anchors.shape[0], 16 + 1), dtype=keras.backend.floatx()) # no actual targets, just indexing
     #valid = np.ones((batch_size, 20, 2), dtype=keras.backend.floatx())
     #valid = np.ones((batch_size, 60, 80, 2), dtype=keras.backend.floatx())
     valid = np.ones((batch_size, 5900, 2), dtype=keras.backend.floatx())
@@ -143,12 +143,19 @@ def anchor_targets_bbox(
 
             # obtain indices of gt annotations with the greatest overlap
             positive_indices, ignore_indices, argmax_overlaps_inds = compute_gt_annotations(anchors, annotations['bboxes'], negative_overlap, positive_overlap)
+
             labels_batch[index, ignore_indices, -1]       = -1
             labels_batch[index, positive_indices, -1]     = 1
+
             #regression_batch[index, ignore_indices, -1]   = -1
             #regression_batch[index, positive_indices, -1] = 1
+
             regression_3D[index, ignore_indices, -1] = -1
             regression_3D[index, positive_indices, -1] = 1
+
+            DR_diff_box[index, ignore_indices, -1] = -1
+            DR_diff_box[index, positive_indices, -1] = 1
+
             # compute target class labels
             labels_batch[index, positive_indices, annotations['labels'][argmax_overlaps_inds[positive_indices]].astype(int)] = 1
             #regression_batch[index, :, :-1] = bbox_transform(anchors, annotations['bboxes'][argmax_overlaps_inds, :])
@@ -238,7 +245,7 @@ def anchor_targets_bbox(
             #image_lr[..., 2] += 123.68
 
             #rind = np.random.randint(0, 1000)
-            #name = '/home/stefan/PyraPose_viz/anno_' + str(rind) + '_RGB.jpg'
+            #name = '/home/stefan/PyraPose_viz/anno_' + str(index) + '_' + str(rind) + '_RGB.jpg'
             #viz_img = np.concatenate([image_lr, np.repeat((depth + 125.0).astype(np.uint8)[:, :, np.newaxis], repeats=3, axis=2)], axis=1)
             #cv2.imwrite(name, image_raw)
             #mask_viz = mask_viz.reshape((image_shapes[0][0], image_shapes[0][1], 3))
@@ -276,9 +283,14 @@ def anchor_targets_bbox(
             regression_3D[index, indices, -1] = -1
             #labels_batch_target[index, indices, -1] = -1
             #regression_3D_target[index, indices, -1] = -1
+            DR_diff_box[index, indices, -1] = -1
 
     #return regression_3D, labels_batch, mask_batch, valid
-    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch), tf.convert_to_tensor(valid)
+    #print(regression_3D.shape)
+    #print(labels_batch.shape)
+    #print(mask_batch.shape)
+    #print(DR_diff_box[:batch_size, :, :].shape)
+    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch), tf.convert_to_tensor(DR_diff_box[:batch_size, :, :])#, tf.convert_to_tensor(valid)
 
 
 def compute_gt_annotations(
