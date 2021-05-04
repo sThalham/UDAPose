@@ -124,20 +124,29 @@ def anchor_targets_bbox(
     # compute labels and regression targets
     for index, (image, annotations) in enumerate(zip(image_group, annotations_group)):
 
+        #print(image[0].shape)
+
         # w/o mask
         mask = annotations['mask']
-        image_shapes = guess_shapes(image.shape[:2], pyramid_levels)
+        image_shapes = guess_shapes(image[0].shape[:2], pyramid_levels)
         # w/o mask
+        #print(image_shapes)
 
         #mask_viz = cv2.resize(image, (image_shapes[0][1], image_shapes[0][0])).reshape((image_shapes[0][1] * image_shapes[0][0], 3))
-        #image_raw = image
-        #image_raw[..., 0] += 103.939
-        #image_raw[..., 1] += 116.779
-        #image_raw[..., 2] += 123.68
+        #image_raw1 = image[0]
+        #image_raw1[..., 0] += 103.939
+        #image_raw1[..., 1] += 116.779
+        #image_raw1[..., 2] += 123.68
+        #image_raw2 = image[1]
+        #image_raw2[..., 0] += 103.939
+        #image_raw2[..., 1] += 116.779
+        #image_raw2[..., 2] += 123.68
 
         #rind = np.random.randint(0, 1000)
+        #image_raw = np.concatenate([image_raw1, image_raw2], axis=1)
         #image_raw = image_raw.astype(np.uint8)
-        #viz_img = False
+        #name = '/home/stefan/PyraPose_viz/anno_' + str(index) + '_' + str(rind) + '_RGB.jpg'
+        #cv2.imwrite(name, image_raw)
 
         if annotations['bboxes'].shape[0]:
 
@@ -274,9 +283,9 @@ def anchor_targets_bbox(
         '''
 
         # ignore annotations outside of image
-        if image.shape:
+        if image[0].shape:
             anchors_centers = np.vstack([(anchors[:, 0] + anchors[:, 2]) / 2, (anchors[:, 1] + anchors[:, 3]) / 2]).T
-            indices = np.logical_or(anchors_centers[:, 0] >= image.shape[1], anchors_centers[:, 1] >= image.shape[0])
+            indices = np.logical_or(anchors_centers[:, 0] >= image[0].shape[1], anchors_centers[:, 1] >= image[0].shape[0])
 
             labels_batch[index, indices, -1]     = -1
             #regression_batch[index, indices, -1] = -1

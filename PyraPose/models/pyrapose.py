@@ -202,34 +202,32 @@ class CustomModel(tf.keras.Model):
         losses = []
         loss_sum = 0
 
-        x_s_1, x_s_2 = tf.split(x_s, num_or_size_splits=2, axis=0)
+        x_s_1, x_s_2 = tf.split(x_s, num_or_size_splits=2, axis=3)
         #y_s_1, y_s_2 = tf.split(y_s, num_or_size_splits=2, axis=0)
+
+        #print(keras.backend.int_shape(x_s_1))
+        #print(keras.backend.int_shape(x_s_2))
 
         with tf.GradientTape() as tape:
             predicts_1st = self.pyrapose(x_s_1)
             predicts_2nd = self.pyrapose(x_s_2)
             for ldx, loss_func in enumerate(self.loss_generator):
-                #print(loss_func)
                 loss_names.append(loss_func)
-                y_s_1, y_s_2 = tf.split(y_s[ldx], num_or_size_splits=2, axis=0)
-                # 1st batch
-                y_now = tf.convert_to_tensor(y_s_1, dtype=tf.float32)
+                y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
                 #print(self.loss_generator[loss_func])
                 loss = self.loss_generator[loss_func](y_now, predicts_1st[ldx])
                 # 2st batch
-                y_now = tf.convert_to_tensor(y_s_2, dtype=tf.float32)
                 loss += self.loss_generator[loss_func](y_now, predicts_2nd[ldx])
                 loss /= 2
                 losses.append(loss)
                 loss_sum += loss
 
             for ldx, loss_func in enumerate(self.loss_discriminator):
-                #print(loss_func)
                 loss_names.append(loss_func)
                 #y_s_1, y_s_2 = tf.split(y_s[3], num_or_size_splits=2, axis=0)
                 y_now = tf.convert_to_tensor(y_s[3], dtype=tf.float32)
                 #print(self.loss_discriminator[loss_func])
-                loss = self.loss_discriminator[loss_func](y_now, predicts_1st[ldx] - predicts_2nd[ldx])
+                loss = self.loss_discriminator[loss_func](y_now, predicts_1st[0] - predicts_2nd[0])
                 loss = (loss / 8) * 200.0
                 losses.append(loss)
                 loss_sum += loss
