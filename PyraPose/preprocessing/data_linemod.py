@@ -320,20 +320,20 @@ class LinemodDataset(tf.data.Dataset):
                 for index, (image, annotations) in enumerate(zip(x_s, y_s)):
 
                     # transform a single group entry
-                    #x_s[index], y_s[index] = random_transform_group_entry(x_s[index], y_s[index])
+                    x_s[index], y_s[index] = random_transform_group_entry(x_s[index], y_s[index])
                     # transform a single group entry
                     #x_t[index] = random_transform_target_entry(x_t[index])
 
                     # preprocess
-                    #x_s[index] = preprocess_image(x_s[index])
+                    x_s[index] = preprocess_image(x_s[index])
                     # x_t[index] = preprocess_image(x_t[index])
-                    #x_s[index] = keras.backend.cast_to_floatx(x_s[index])
+                    x_s[index] = keras.backend.cast_to_floatx(x_s[index])
                     # x_t[index] = keras.backend.cast_to_floatx(x_t[index])
 
                 # x_s to image_batch
-                #image_source_batch = np.zeros((batch_size,) + max_shape, dtype=keras.backend.floatx())
-                #for image_index, image in enumerate(x_s):
-                #    image_source_batch[image_index, :image.shape[0], :image.shape[1], :image.shape[2]] = image
+                image_source_batch = np.zeros((batch_size,) + max_shape, dtype=keras.backend.floatx())
+                for image_index, image in enumerate(x_s):
+                    image_source_batch[image_index, :image.shape[0], :image.shape[1], :image.shape[2]] = image
 
                 # image_target_batch = np.zeros((batch_size,) + max_shape, dtype=keras.backend.floatx())
                 # for image_index, image in enumerate(x_t):
@@ -345,31 +345,6 @@ class LinemodDataset(tf.data.Dataset):
                 # image_target_batch = tf.convert_to_tensor(image_target_batch, dtype=tf.float32)
                 # yield image_source_batch, target_batch, image_target_batch
                 #yield image_source_batch, target_batch
-
-                    # transform same image twice with same transform generator
-                    next_transform = next(transform_generator)
-                    x_s_1, y_s_1 = random_transform_group_entry(x_s[index], y_s[index], next_transform)
-                    x_s_2, y_s_2 = random_transform_group_entry(x_s[index], y_s[index], next_transform)
-
-                    # preprocess 2nd
-                    x_s_1 = preprocess_image(x_s_1)
-                    x_s_1 = keras.backend.cast_to_floatx(x_s_1)
-                    x_s_2 = preprocess_image(x_s_2)
-                    x_s_2 = keras.backend.cast_to_floatx(x_s_2)
-
-                    x_s[index] = [x_s_1, x_s_2]
-                    y_s[index] = y_s_1
-
-                image_source_batch = np.zeros((batch_size,) + max_shape, dtype=keras.backend.floatx())
-                image_source_batch = np.concatenate([image_source_batch, image_source_batch], axis=3)
-
-                for image_index, image_tuple in enumerate(x_s):
-                    image=image_tuple[0]
-                    #print(image.shape)
-                    image_source_batch[image_index, :image.shape[0], :image.shape[1], :image.shape[2]] = image
-                    image = image_tuple[1]
-                    #print(image.shape)
-                    image_source_batch[image_index, :image.shape[0], :image.shape[1], image.shape[2]:] = image
 
                 target_batch = compute_anchor_targets(anchors, x_s, y_s, len(classes))
 
