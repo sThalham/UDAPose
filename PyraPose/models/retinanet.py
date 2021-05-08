@@ -147,7 +147,7 @@ def default_reconstruction_model(pyramid_feature_size=256, regression_feature_si
     if keras.backend.image_data_format() == 'channels_first':
         inputs  = keras.layers.Input(shape=(pyramid_feature_size, None, None))
     else:
-        inputs  = keras.layers.Input(shape=(60, 80, pyramid_feature_size))
+        inputs  = keras.layers.Input(shape=(None, None, pyramid_feature_size))
 
     outputs = inputs
     for i in range(4):
@@ -160,7 +160,7 @@ def default_reconstruction_model(pyramid_feature_size=256, regression_feature_si
     outputs = keras.layers.Conv2D(3, **options)(outputs) #, name='pyramid_regression3D'
     if keras.backend.image_data_format() == 'channels_first':
         outputs = keras.layers.Permute((2, 3, 1))(outputs) # , name='pyramid_regression3D_permute'
-    outputs = keras.layers.Reshape((60, 80,  3))(outputs) # , name='pyramid_regression3D_reshape'
+    outputs = keras.layers.Reshape((-1, 16))(outputs) # , name='pyramid_regression3D_reshape'
 
     return keras.models.Model(inputs=inputs, outputs=outputs, name=name)
 
@@ -393,7 +393,7 @@ def retinanet(
     #recon_head = default_reconstruction_model()
     discriminator_head = default_discriminator(num_classes)
 
-    discriminator_head.trainable = False
+    #discriminator_head.trainable = False
 
     b1, b2, b3 = backbone_layers
 
@@ -413,7 +413,7 @@ def retinanet(
     # discriminator conditioned on P3 feature classification
     # domain = discriminator_head(features[0])
 
-    '''
+
     # discriminator for feature map conditioned on predicted 3Dbox
     pointsP3, pointsP4, pointsP5 = tf.split(pyramids[0], num_or_size_splits=[43200, 10800, 2700], axis=1)
     pointsP3 = keras.layers.Reshape((60, 80, num_anchors * 16))(pointsP3)
@@ -422,18 +422,17 @@ def retinanet(
     disc_P4 = keras.layers.Concatenate(axis=3)([features[1], pointsP4])
     pointsP5 = keras.layers.Reshape((15, 20, num_anchors * 16))(pointsP5)
     disc_P5 = keras.layers.Concatenate(axis=3)([features[2], pointsP5])
-    domainP3 = discriminator_head(disc_P3)
-    domainP4 = discriminator_head(disc_P4)
-    domainP5 = discriminator_head(disc_P5)
-    domain = keras.layers.Concatenate(axis=1, name='domain')([domainP3, domainP4, domainP5])
+    discP3 = discriminator_head(disc_P3)
+    discP4 = discriminator_head(disc_P4)
+    discP5 = discriminator_head(disc_P5)
+    reconstruction = keras.layers.Concatenate(axis=1, name='rec')([discP3, discP4, discP5])
 
-    pyramids.append(domain)
+    pyramids.append(reconstruction)
     pyramids.append(features[0])
     pyramids.append(features[1])
     pyramids.append(features[2])
-    '''
 
-    return keras.models.Model(inputs=inputs, outputs=pyramids, name=name)#, discriminator_head
+    return keras.models.Model(inputs=inputs, outputs=pyramids, name=name), discriminator_head
 
 
 def retinanet_bbox(

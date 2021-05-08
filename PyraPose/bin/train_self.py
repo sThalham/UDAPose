@@ -47,7 +47,7 @@ from ..utils.model import freeze as freeze_model
 from ..utils.transform import random_transform_generator
 from ..utils.image import resize_image
 
-from ..models.pyrapose import CustomModel
+from ..models.pyrapose import SATModel
 
 
 def makedirs(path):
@@ -70,9 +70,9 @@ def makedirs(path):
 def model_with_weights(model, weights, skip_mismatch):
     if weights is not None:
         # plus discriminator
-        #model[0].load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
+        model[0].load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
         # w/o discriminator
-        model.load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
+        #model.load_weights(weights, by_name=True, skip_mismatch=skip_mismatch)
     return model
 
 
@@ -95,28 +95,25 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
         training_model = multi_gpu_model(model, gpus=multi_gpu)
     else:
         # w/ disriminator
-        #model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights,skip_mismatch=True)
+        model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights,skip_mismatch=True)
         # w/o disriminator
-        model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+        #model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
         training_model = model
 
     prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
 
-    #gan = CustomModel(pyrapose=training_model, discriminator=discriminator_model)
-    gan = CustomModel(pyrapose=training_model)
+    gan = SATModel(generator=training_model, discriminator=discriminator_model)
     #optimizer_adam = tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001)
     gan.compile(
         gen_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
-        #dis_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
+        dis_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
         gen_loss={
             '3Dbox'         : losses.orthogonal_l1(),
             'cls'           : losses.focal(),
             'mask'          : losses.focal(),
-            'recon'         : losses.weighted_mse(),
+            #'rec'           : losses.weighted_mse(),
         },
-        dis_loss={'real'    : losses.weighted_mse(),
-                  'fake'    : losses.weighted_mse()
-        }
+        dis_loss=losses.weighted_mse()
     )
     '''
     # make prediction model
