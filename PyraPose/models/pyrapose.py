@@ -48,7 +48,7 @@ class CustomModel(tf.keras.Model):
         # Add random noise to the labels - important trick!
         # labels += 0.05 * tf.random.uniform(tf.shape(labels))
         x_st = tf.concat([x_s, x_t], axis=0)
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(persistent=True) as tape:
             predicts_gen = self.pyrapose(x_st)
 
         # split predictions into source and target
@@ -71,7 +71,7 @@ class CustomModel(tf.keras.Model):
         source_predictions_generator = [source_points, source_locations, source_mask, source_domain]
 
         cls_shape = tf.shape(source_mask)[2]
-        with tf.GradientTape() as tape:
+        with tape:
             for ldx, loss_func in enumerate(self.loss_generator):
                 loss_names.append(loss_func)
                 y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
@@ -118,6 +118,7 @@ class CustomModel(tf.keras.Model):
         disc_patchP5 = tf.concat([target_patchP5, source_patchP5], axis=0)
 
         disc_patches = [disc_patchP3, disc_patchP4, disc_patchP5]
+        disc_reso = [[60, 80], [30, 40], [15, 20]]
 
         ## discriminator conditioned on feature space alone
         #disc_patch = tf.concat([target_features_re, source_features_re], axis=0)
@@ -136,50 +137,56 @@ class CustomModel(tf.keras.Model):
         #    d_loss = self.loss_discriminator(labels, domain)
 
         # UDA pose
-        normalizer = keras.backend.maximum(1, keras.backend.shape(indices)[0])
-        valid = tf.ones((batch_size, 60, 80,  1))
-        fake = tf.zeros((batch_size, 60, 80, 1))
-        targets_dis = tf.concat([validP3, fakeP3], axis=0)
-        #fake2 = tf.ones((batch_size, 60, 80, 1))
+        real = tf.ones((batch_size, 56700,  1))
+        fake = tf.zeros((batch_size, 56700, 1))
 
-        validP3 = tf.ones((batch_size, 60, 80, 2))
-        fake1P3 = tf.zeros((batch_size, 60, 80, 1))
-        fake2P3 = tf.ones((batch_size, 60, 80, 1))
-        fakeP3 = tf.concat([fake1P3, fake2P3], axis=3)
-        labelsP3 = tf.concat([validP3, fakeP3], axis=0)
+        tf.math.reduce_max(target_locations, axis=2, keepdims=False, name=None) # find max value along cls dimension
+        real_pseudo_anno_cls = tf.math.greater(target_locations, tf.ones((batch_size, 56700,  1))*0.5)
+        real_anno = tf.zeros((batch_size, 56700, 1))
+        real_anno = real_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
+        real_targets_dis = tf.concat([real, real_anno], axis=2)
 
-        validP4 = tf.ones((batch_size, 30, 40, 2))
-        fake1P4 = tf.zeros((batch_size, 30, 40, 1))
-        fake2P4 = tf.ones((batch_size, 30, 40, 1))
-        fakeP4 = tf.concat([fake1P4, fake2P4], axis=3)
-        labelsP4 = tf.concat([validP4, fakeP4], axis=0)
+        fake_anno = y_s[1][:, :, :-1]
+        fake_targets_dis = tf.concat([fake, fake_anno], axis=2)
 
-        validP5 = tf.ones((batch_size, 15, 20, 2))
-        fake1P5 = tf.zeros((batch_size, 15, 20, 1))
-        fake2P5 = tf.ones((batch_size, 15, 20, 1))
-        fakeP5 = tf.concat([fake1P5, fake2P5], axis=3)
-        labelsP5 = tf.concat([validP5, fakeP5], axis=0)
+        disc_labels = tf.concat([real_targets_dis, fake_targets_dis], axis=2)
 
-        disc_labels = [labelsP3, labelsP4, labelsP5]
+        #validP3 = tf.ones((batch_size, 60, 80, 2))
+        #fake1P3 = tf.zeros((batch_size, 60, 80, 1))
+        #fake2P3 = tf.ones((batch_size, 60, 80, 1))
+        #fakeP3 = tf.concat([fake1P3, fake2P3], axis=3)
+        #labelsP3 = tf.concat([validP3, fakeP3], axis=0)
+#
+        #validP4 = tf.ones((batch_size, 30, 40, 2))
+        #fake1P4 = tf.zeros((batch_size, 30, 40, 1))
+        #fake2P4 = tf.ones((batch_size, 30, 40, 1))
+        #fakeP4 = tf.concat([fake1P4, fake2P4], axis=3)
+        #labelsP4 = tf.concat([validP4, fakeP4], axis=0)
+
+        #validP5 = tf.ones((batch_size, 15, 20, 2))
+        #fake1P5 = tf.zeros((batch_size, 15, 20, 1))
+        #fake2P5 = tf.ones((batch_size, 15, 20, 1))
+        #fakeP5 = tf.concat([fake1P5, fake2P5], axis=3)
+        #labelsP5 = tf.concat([validP5, fakeP5], axis=0)
+
+        #disc_labels = [labelsP3, labelsP4, labelsP5]
 
         pred_dis = []
+        #with tf.GradientTape() as tape_dis:
         with tape:
             for ddx, disc_map in enumerate(disc_patches):
                 domain = self.discriminator(disc_map)
-                domain = tf.reshape(target_featuresP3, (batch_size * 2, keras.backend.int_shape(x_s)[1] * keras.backend.int_shape(x_s)[2], 1))
-                predictions_dis.append(domain)
-            predictions_dis = tf.concat([predictions_dis[0], predictions_dis[1], predictions_dis[2]], axis=1)
-            loss = self.loss_discriminator(disc_labels[ddx], predictions_dis)
+                #domain = tf.reshape(domain, (batch_size * 2, keras.backend.int_shape(x_s)[1] * keras.backend.int_shape(x_s)[2], 1))
+                domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1], 1))
+                pred_dis.append(domain)
+            predictions_dis = tf.concat([pred_dis[0], pred_dis[1], pred_dis[2]], axis=1)
+            loss = self.loss_discriminator(disc_labels, predictions_dis)
             d_loss_sum += loss
 
         grads_dis = tape.gradient(d_loss_sum, self.discriminator.trainable_weights)
 
-
-
         self.optimizer_discriminator.apply_gradients(zip(grads_dis, self.discriminator.trainable_weights))
         self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
-
-        #del tape
 
         return_losses = {}
         return_losses["loss"] = loss_sum
