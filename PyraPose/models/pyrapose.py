@@ -20,7 +20,7 @@ class CustomModel(tf.keras.Model):
         self.loss_discriminator = dis_loss
 
 
-    @tf.function
+    #@tf.function
     def train_step(self, data):
 
         #x_s = data[0]['x']
@@ -36,7 +36,7 @@ class CustomModel(tf.keras.Model):
         loss_sum = 0
         d_loss_sum = 0
 
-        #print(keras.backend.int_shape(x_s))
+        print(keras.backend.int_shape(x_s))
         #print(keras.backend.int_shape(y_s))
         #print(keras.backend.int_shape(x_t))
 
@@ -47,43 +47,65 @@ class CustomModel(tf.keras.Model):
         # from Chollet
         # Add random noise to the labels - important trick!
         # labels += 0.05 * tf.random.uniform(tf.shape(labels))
-        x_st = tf.concat([x_s, x_t], axis=0)
-        with tf.GradientTape(persistent=True) as tape:
-            predicts_gen = self.pyrapose(x_st)
-
-        # split predictions into source and target
-        points = predicts_gen[0]
-        locations = predicts_gen[1]
-        masks = predicts_gen[2]
-        domain = predicts_gen[3]
-        featuresP3 = predicts_gen[4]
-        featuresP4 = predicts_gen[5]
-        featuresP5 = predicts_gen[6]
-        source_points, target_points = tf.split(points, num_or_size_splits=2, axis=0)
-        source_locations, target_locations = tf.split(locations, num_or_size_splits=2, axis=0)
-        source_mask, target_mask = tf.split(masks, num_or_size_splits=2, axis=0)
-        source_domain, target_domain = tf.split(domain, num_or_size_splits=2, axis=0)
-        source_featuresP3, target_featuresP3 = tf.split(featuresP3, num_or_size_splits=2, axis=0)
-        source_featuresP4, target_featuresP4 = tf.split(featuresP4, num_or_size_splits=2, axis=0)
-        source_featuresP5, target_featuresP5 = tf.split(featuresP5, num_or_size_splits=2, axis=0)
-
-        # supervised training only on source domain
-        source_predictions_generator = [source_points, source_locations, source_mask, source_domain]
-
-        cls_shape = tf.shape(source_mask)[2]
-        with tape:
+        #x_st = tf.concat([x_s, x_t], axis=0)
+        with tf.GradientTape() as tape:
+            predicts_gen = self.pyrapose(x_s)
             for ldx, loss_func in enumerate(self.loss_generator):
+                print(loss_func)
                 loss_names.append(loss_func)
                 y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
-                loss = self.loss_generator[loss_func](y_now, source_predictions_generator[ldx])
+                print(keras.backend.int_shape(y_s[ldx]))
+                print(keras.backend.int_shape(predicts_gen[ldx]))
+                loss = self.loss_generator[loss_func](y_now, predicts_gen[ldx])
                 losses.append(loss)
                 loss_sum += loss
 
         # compute gradients of pyrapose with discriminator frozen
         grads_gen = tape.gradient(loss_sum, self.pyrapose.trainable_weights)
+        self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
+
+        # split predictions into source and target
+        #points = predicts_gen[0]
+        #locations = predicts_gen[1]
+        #masks = predicts_gen[2]
+        #domain = predicts_gen[3]
+        #featuresP3 = predicts_gen[4]
+        #featuresP4 = predicts_gen[5]
+        #featuresP5 = predicts_gen[6]
+        #source_points, target_points = tf.split(points, num_or_size_splits=2, axis=0)
+        #source_locations, target_locations = tf.split(locations, num_or_size_splits=2, axis=0)
+        #source_mask, target_mask = tf.split(masks, num_or_size_splits=2, axis=0)
+        #source_domain, target_domain = tf.split(domain, num_or_size_splits=2, axis=0)
+        #source_featuresP3, target_featuresP3 = tf.split(featuresP3, num_or_size_splits=2, axis=0)
+        #source_featuresP4, target_featuresP4 = tf.split(featuresP4, num_or_size_splits=2, axis=0)
+        #source_featuresP5, target_featuresP5 = tf.split(featuresP5, num_or_size_splits=2, axis=0)
+
+        # supervised training only on source domain
+        #source_predictions_generator = [source_points, source_locations, source_mask, source_domain]
+
+        #cls_shape = tf.shape(source_mask)[2]
+        #with tape:
+
 
         #disc_source = tf.concat([source_features_re, source_points_re], axis=3)
         #disc_target = tf.concat([target_features_re, target_points_re], axis=3)
+
+        predicts_target = self.pyrapose(x_t)
+        target_points = predicts_target[0]
+        target_locations = predicts_target[1]
+        # masks = predicts_gen[2]
+        # domain = predicts_gen[3]
+        target_featuresP3 = predicts_target[4]
+        target_featuresP4 = predicts_target[5]
+        target_featuresP5 = predicts_target[6]
+
+        source_points = predicts_gen[0]
+        # locations = predicts_gen[1]
+        # masks = predicts_gen[2]
+        # domain = predicts_gen[3]
+        source_featuresP3 = predicts_gen[4]
+        source_featuresP4 = predicts_gen[5]
+        source_featuresP5 = predicts_gen[6]
 
         # discriminator for feature map conditioned on predicted pose
         source_pointsP3, source_pointsP4, source_pointsP5 = tf.split(source_points, num_or_size_splits=[43200, 10800, 2700], axis=1)
@@ -91,8 +113,7 @@ class CustomModel(tf.keras.Model):
         source_pointsP4_re = tf.reshape(source_pointsP4, (batch_size, 30, 40, 9 * 16))
         source_pointsP5_re = tf.reshape(source_pointsP5, (batch_size, 15, 20, 9 * 16))
 
-        target_pointsP3, target_pointsP4, target_pointsP5 = tf.split(source_points,
-                                                                     num_or_size_splits=[43200, 10800, 2700], axis=1)
+        target_pointsP3, target_pointsP4, target_pointsP5 = tf.split(target_points, num_or_size_splits=[43200, 10800, 2700], axis=1)
         target_pointsP3_re = tf.reshape(target_pointsP3, (batch_size, 60, 80, 9 * 16))
         target_pointsP4_re = tf.reshape(target_pointsP4, (batch_size, 30, 40, 9 * 16))
         target_pointsP5_re = tf.reshape(target_pointsP5, (batch_size, 15, 20, 9 * 16))
@@ -140,16 +161,17 @@ class CustomModel(tf.keras.Model):
         real = tf.ones((batch_size, 56700,  1))
         fake = tf.zeros((batch_size, 56700, 1))
 
-        tf.math.reduce_max(target_locations, axis=2, keepdims=False, name=None) # find max value along cls dimension
+        target_locations = tf.math.reduce_max(target_locations, axis=2, keepdims=False, name=None) # find max value along cls dimension
         real_pseudo_anno_cls = tf.math.greater(target_locations, tf.ones((batch_size, 56700,  1))*0.5)
         real_anno = tf.zeros((batch_size, 56700, 1))
+        print(keras.backend.int_shape(real_pseudo_anno_cls))
         real_anno = real_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
         real_targets_dis = tf.concat([real, real_anno], axis=2)
 
-        fake_anno = y_s[1][:, :, :-1]
+        fake_anno = y_s[0][:, :, :-1]
         fake_targets_dis = tf.concat([fake, fake_anno], axis=2)
 
-        disc_labels = tf.concat([real_targets_dis, fake_targets_dis], axis=2)
+        disc_labels = tf.concat([real_targets_dis, fake_targets_dis], axis=0)
 
         #validP3 = tf.ones((batch_size, 60, 80, 2))
         #fake1P3 = tf.zeros((batch_size, 60, 80, 1))
@@ -186,7 +208,6 @@ class CustomModel(tf.keras.Model):
         grads_dis = tape.gradient(d_loss_sum, self.discriminator.trainable_weights)
 
         self.optimizer_discriminator.apply_gradients(zip(grads_dis, self.discriminator.trainable_weights))
-        self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
 
         return_losses = {}
         return_losses["loss"] = loss_sum
