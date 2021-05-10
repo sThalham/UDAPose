@@ -657,6 +657,7 @@ class LinemodDataset(tf.data.Dataset):
                 # print(type(image_source_batch))
                 # print(type(target_batch))
 
+
                 yield image_source_batch, target_batch, image_target_batch
 
     def __new__(self, data_dir, set_name, self_dir, batch_size):
