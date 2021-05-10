@@ -164,37 +164,6 @@ def default_reconstruction_model(pyramid_feature_size=256, regression_feature_si
 
     return keras.models.Model(inputs=inputs, outputs=outputs, name=name)
 
-'''
-def default_discriminator(pyramid_feature_size=256, regression_feature_size=256, name='domain'):
-    options = {
-        'kernel_size'        : 3,
-        'strides'            : 2,
-        'padding'            : 'same',
-        'kernel_initializer' : keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
-        'bias_initializer'   : 'zeros',
-        'activation'         : 'relu',
-    }
-
-    if keras.backend.image_data_format() == 'channels_first':
-        inputs  = keras.layers.Input(shape=(pyramid_feature_size, None, None))
-    else:
-        inputs  = keras.layers.Input(shape=(60, 80, 3))
-
-    outputs = inputs
-    outputs = keras.layers.Conv2D(32, **options)(outputs)
-    outputs = keras.layers.Conv2D(64, **options)(outputs)
-    outputs = keras.layers.Conv2D(128, **options)(outputs)
-    outputs = keras.layers.Conv2D(256, **options)(outputs)
-    outputs = keras.layers.Conv2D(512, **options)(outputs)
-
-    #outputs = keras.layers.Conv2D(1, **options)(outputs) #, name='pyramid_regression3D'
-    outputs = keras.layers.Conv2D(1, kernel_size=1, strides=1, padding='same', kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None), bias_initializer='zeros', activation='sigmoid')(outputs)
-    outputs = keras.layers.Reshape((-1, 1))(outputs)
-    #print('discriminator out: ', keras.backend.int_shape(outputs))
-
-    return keras.models.Model(inputs=inputs, outputs=outputs, name=name)
-'''
-
 
 def default_discriminator(
     num_classes,
@@ -221,17 +190,17 @@ def default_discriminator(
         outputs = keras.layers.Conv2D(
             filters=classification_feature_size,
             activation='relu',
-            kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
+            #kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
             #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
-            bias_initializer='zeros',
+            #bias_initializer='zeros',
             **options
         )(outputs)
 
     outputs = keras.layers.Conv2D(
-        filters=1,
+        filters=9,
         #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
-        kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
-        bias_initializer=initializers.PriorProbability(probability=prior_probability),
+        #kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
+        #bias_initializer=initializers.PriorProbability(probability=prior_probability),
         **options
     )(outputs)
 

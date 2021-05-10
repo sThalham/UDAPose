@@ -158,20 +158,19 @@ class CustomModel(tf.keras.Model):
         real = tf.ones((batch_size, 56700,  1))
         fake = tf.zeros((batch_size, 56700, 1))
 
-        #target_locations_red = tf.math.reduce_max(target_locations, axis=2, keepdims=False, name=None) # find max value along cls dimension
-        #real_pseudo_anno_cls = tf.math.greater(target_locations_red, tf.fill((batch_size, 56700, 1), 0.5))
-        #real_anno = tf.ones((batch_size, 56700, 1))
-        #real_anno = real_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
-        #real_targets_dis = tf.concat([real, real_anno], axis=2)
+        target_locations_red = tf.math.reduce_max(target_locations, axis=2, keepdims=False, name=None) # find max value along cls dimension
+        target_locations_red = tf.expand_dims(target_locations_red, axis=2)
+        #print(target_locations_red)
+        real_pseudo_anno_cls = tf.math.greater(target_locations_red, tf.fill((batch_size, 56700, 1), 0.5))
+        real_anno = tf.ones((batch_size, 56700, 1))
+        real_anno = real_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
+        real_targets_dis = tf.concat([real, real_anno], axis=2)
 
         fake_anno = y_s[0][:, :, -1]
+        fake_anno = tf.expand_dims(fake_anno, axis=2)
         fake_targets_dis = tf.concat([fake, fake_anno], axis=2)
 
-        #temp
-        real_targets_dis = tf.concat([real, fake_anno], axis=2)
-
         disc_labels = tf.concat([real_targets_dis, fake_targets_dis], axis=0)
-        tf.ensure_shape(disc_labels, [16, 56700, 2])
         #print('disc_labels: ', disc_labels)
 
         #validP3 = tf.ones((batch_size, 60, 80, 2))
@@ -203,7 +202,7 @@ class CustomModel(tf.keras.Model):
                 pred_dis.append(domain)
             predictions_dis = tf.concat([pred_dis[0], pred_dis[1], pred_dis[2]], axis=1)
             loss_d = self.loss_discriminator(disc_labels, predictions_dis)
-            print('loss_d ', loss_d)
+            #tf.print(loss_d)
             #d_loss_sum += loss
 
         grads_dis = tape.gradient(loss_d, self.discriminator.trainable_weights)
