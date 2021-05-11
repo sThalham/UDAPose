@@ -1,5 +1,6 @@
 import tensorflow.keras as keras
 import tensorflow as tf
+import sys
 from .. import initializers
 from .. import layers
 from ..utils.anchors import AnchorParameters
@@ -21,130 +22,129 @@ class SATModel(tf.keras.Model):
         #self.loss_sum = keras.metrics.Sum()
 
     # train step for conditional target adversarial training
-    @tf.function
+    #@tf.function
     def train_step(self, data):
+
+        # x_s = data[0]['x']
+        # y_s = data[0]['y']
+        # x_t = data[0]['domain']
 
         x_s = data[0]
         y_s = data[1]
 
-        loss_names_gen = []
-        loss_gen = []
-        loss_sum_gen = 0
-
-        # run prediction to sample latent space
-        with tf.GradientTape() as tape:
-            predicts_gen = self.generator(x_s)
-            for ldx, loss_func in enumerate(self.loss_generator):
-                loss_names_gen.append(loss_func)
-                print(self.loss_generator[loss_func])
-                y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
-                loss = self.loss_generator[loss_func](y_now, predicts_gen[ldx])
-                #loss = self.loss_generator[loss_func](y_now, filtered_predictions[ldx])
-                print(loss)
-                loss_gen.append(loss)
-                loss_sum_gen += loss
-
-            print('rec')
-
-            loss_names_gen.append('rec')
-            print(self.loss_discriminator)
-            y_s_0 = tf.convert_to_tensor(y_s[0], dtype=tf.float32)
-            gt_targets, anchor_validity = tf.split(y_s_0, num_or_size_splits=[16, 1], axis=2)
-            generated = tf.concat([predicts_gen, anchor_validity], axis=2)
-            loss = self.loss_discriminator(generated, predicts_gen[3])
-            # loss = self.loss_generator[loss_func](y_now, filtered_predictions[ldx])
-            print(loss)
-            loss_gen.append(loss)
-            loss_sum_gen += loss
+        loss_names = []
+        losses = []
+        loss_sum = 0
+        d_loss_sum = 0
 
         # Sample random points in the latent space
         batch_size = tf.shape(x_s)[0]
+        #tf.print(tf.shape(x_s))
+        # UDA mask
 
-        points = predicts_gen[0]
-        #locations = predicts_gen[1]
-        #masks = predicts_gen[2]
-        recon = predicts_gen[3]
+        # from Chollet
+        # Add random noise to the labels - important trick!
+        # labels += 0.05 * tf.random.uniform(tf.shape(labels))
+        # x_st = tf.concat([x_s, x_t], axis=0)
+
+        with tf.GradientTape() as tape:
+            predicts_gen = self.generator(x_s)
+
+            for ldx, loss_func in enumerate(self.loss_generator):
+                # print(loss_func)
+                loss_names.append(loss_func)
+                y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
+                loss = self.loss_generator[loss_func](y_now, predicts_gen[ldx])
+
+                losses.append(loss)
+                loss_sum += loss
+
+        # compute gradients of pyrapose with discriminator frozen
+        grads_gen = tape.gradient(loss_sum, self.generator.trainable_weights)
+        self.optimizer_generator.apply_gradients(zip(grads_gen, self.generator.trainable_weights))
+
+        gt = y_s[0]
+        generated = predicts_gen[0]
+        generated_gt = tf.concat([generated, gt[:, :, -1]], axis=2)
+
+        locations = predicts_gen[1]
+        masks = predicts_gen[2]
+        reconstruction = predicts_gen[3]
         featuresP3 = predicts_gen[4]
         featuresP4 = predicts_gen[5]
         featuresP5 = predicts_gen[6]
 
-        #cls_shape = tf.shape(locations)[2]
-        # split predictions to pyramid levels
-        pointsP3, pointsP4, pointsP5 = tf.split(points, num_or_size_splits=[43200, 10800, 2700], axis=1)
-        pointsP3_re = tf.reshape(pointsP3, (batch_size, 60, 80, 9 * 16))
-        pointsP4_re = tf.reshape(pointsP4, (batch_size, 30, 40, 9 * 16))
-        pointsP5_re = tf.reshape(pointsP5, (batch_size, 15, 20, 9 * 16))
+        # inputs discriminator for feature map conditioned on predicted pose
+        genP3, genP4, genP5 = tf.split(generated, num_or_size_splits=[43200, 10800, 2700], axis=1)
+        genP3_re = tf.reshape(genP3, (batch_size, 60, 80, 9 * 16))
+        genP4_re = tf.reshape(genP4, (batch_size, 30, 40, 9 * 16))
+        genP5_re = tf.reshape(genP5, (batch_size, 15, 20, 9 * 16))
 
-        # split predictions to pyramid levels
-        gtP3, gtP4, gtP5 = tf.split(y_s[0], num_or_size_splits=[43200, 10800, 2700], axis=1)
+        gen_patchP3 = tf.concat([featuresP3, genP3_re], axis=3)
+        gen_patchP4 = tf.concat([featuresP4, genP4_re], axis=3)
+        gen_patchP5 = tf.concat([featuresP5, genP5_re], axis=3)
+
+        gtP3, gtP4, gtP5 = tf.split(gt[:, :, :-1], num_or_size_splits=[43200, 10800, 2700], axis=1)
         gtP3_re = tf.reshape(gtP3, (batch_size, 60, 80, 9 * 16))
         gtP4_re = tf.reshape(gtP4, (batch_size, 30, 40, 9 * 16))
         gtP5_re = tf.reshape(gtP5, (batch_size, 15, 20, 9 * 16))
 
-        featuresP3_re = tf.reshape(featuresP3, (batch_size, 60, 80, 256))
-        featuresP4_re = tf.reshape(featuresP4, (batch_size, 30, 40, 256))
-        featuresP5_re = tf.reshape(featuresP5, (batch_size, 15, 20, 256))
+        gt_patchP3 = tf.concat([featuresP3, gtP3_re], axis=3)
+        gt_patchP4 = tf.concat([featuresP4, gtP4_re], axis=3)
+        gt_patchP5 = tf.concat([featuresP5, gtP5_re], axis=3)
 
-        patchP3_gen = tf.concat([featuresP3_re, pointsP3_re], axis=3)
-        patchP4_gen = tf.concat([featuresP4_re, pointsP4_re], axis=3)
-        patchP5_gen = tf.concat([featuresP5_re, pointsP5_re], axis=3)
+        # input patches
+        disc_patches_gt = [gt_patchP3, gt_patchP4, gt_patchP5]
+        disc_patches_gen = [gen_patchP3, gen_patchP4, gen_patchP5]
+        disc_reso = [[60, 80], [30, 40], [15, 20]]
 
-        patchP3_gt = tf.concat([featuresP3_re, gtP3_re], axis=3)
-        patchP4_gt = tf.concat([featuresP4_re, gtP4_re], axis=3)
-        patchP5_gt = tf.concat([featuresP5_re, gtP5_re], axis=3)
+        # target patches
+        #real = tf.ones((batch_size, 56700, 1))
+        #fake = tf.zeros((batch_size, 56700, 1))
+        #points_anno = y_s[0][:, :, -1]
+        #points_anno = tf.expand_dims(points_anno, axis=2)
+        #real_targets_dis = tf.concat([gt, points_anno], axis=2)
+        #fake_targets_dis = tf.concat([generated, points_anno], axis=2)
 
-        disc_patch_gen = [patchP3_gen, patchP4_gen, patchP5_gen]
-        disc_patch_gt = [patchP3_gt, patchP4_gt, patchP5_gt]
-
-        # Forward 4: Discriminator reconstructs gt
-        disc_patch_real = []
-        disc_patch_fake = []
-        #loss_dis = 0
-
+        # run and train discriminator
+        recon_gt = []
+        recon_gen = []
         with tf.GradientTape() as tape:
-            for idx, patch in enumerate(disc_patch_gt):
-                rec_level = self.discriminator(patch)
-                rec_level = tf.reshape(rec_level, (batch_size, tf.shape(rec_level)[1] * tf.shape(rec_level)[2], 16))
-                disc_patch_real.append(rec_level)
+        #with tape:
+            for ddx, disc_map in enumerate(disc_patches_gt):
+                gt_rec_lv = self.discriminator(disc_map)
+                gen_rec_lv = self.discriminator(disc_patches_gen[ddx])
+                # domain = tf.reshape(domain, (batch_size * 2, keras.backend.int_shape(x_s)[1] * keras.backend.int_shape(x_s)[2], 1))
+                gt_rec_lv = tf.reshape(gt_rec_lv, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
+                gen_rec_lv = tf.reshape(gen_rec_lv, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
+                recon_gt.append(gt_rec_lv)
+                recon_gen.append(gen_rec_lv)
+            predictions_gt = tf.concat([recon_gt[0], recon_gt[1], recon_gt[2]], axis=1)
+            loss_real = self.loss_discriminator(gt, predictions_gt)
+            predictions_gen = tf.concat([recon_gen[0], recon_gen[1], recon_gen[2]], axis=1)
+            loss_fake = self.loss_discriminator(generated_gt, predictions_gen)
+            loss_d = loss_real - loss_fake
 
-            recon_real = tf.concat(disc_patch_real, axis=2)
-            loss_real = self.loss_discriminator(y_s[0], recon_real)
+            # TODO hyperparameters for loss balancing
 
-            for idx, patch in enumerate(disc_patch_gen):
-                rec_level = self.discriminator(patch)
-                rec_level = tf.reshape(rec_level, (batch_size, tf.shape(rec_level)[1] * tf.shape(rec_level)[2], 16))
-                disc_patch_fake.append(rec_level)
+        grads_dis = tape.gradient(loss_d, self.discriminator.trainable_weights)
 
-            recon_fake = tf.concat(disc_patch_real, axis=2)
-            loss_fake = self.loss_discriminator(points, recon_fake)
-
-            loss_dis = loss_real - self.k * loss_fake
-
-            #self.k = self.k + self.lambda * (self.gamma * loss_real - loss_fake)
-
-        # Accumulate discriminator
-        grads_dis = tape.gradient(loss_dis, self.discriminator.trainable_weights)
-        # Update discriminator
         self.optimizer_discriminator.apply_gradients(zip(grads_dis, self.discriminator.trainable_weights))
-
-        # Accumulate generator
-        grads_gen = tape.gradient(loss_sum_gen, self.generator.trainable_weights)
-        # Update generator
-        self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
+        #self.optimizer_generator.apply_gradients(zip(grads_gen, self.generator.trainable_weights))
 
         return_losses = {}
-        return_losses["loss"] = loss_sum_gen + loss_dis
-        for name, loss in zip(loss_names_gen, loss_gen):
+        return_losses["loss"] = loss_sum
+        for name, loss in zip(loss_names, losses):
             return_losses[name] = loss
-        return_losses['disc'] = loss_dis
 
         return return_losses
 
     def call(self, inputs, training=False):
-        x = self.generator(inputs[0])
+        x = self.pyrapose(inputs[0])
         if training:
-            x = self.generator(inputs[0])
+            x = self.pyrapose(inputs[0])
         return x
+
 
 
 

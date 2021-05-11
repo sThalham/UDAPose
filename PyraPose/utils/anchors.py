@@ -128,7 +128,7 @@ def anchor_targets_bbox(
 
         # w/o mask
         mask = annotations['mask']
-        image_shapes = guess_shapes(image[0].shape[:2], pyramid_levels)
+        image_shapes = guess_shapes(image.shape[:2], pyramid_levels)
         # w/o mask
         #print(image_shapes)
 
@@ -283,9 +283,9 @@ def anchor_targets_bbox(
         '''
 
         # ignore annotations outside of image
-        if image[0].shape:
+        if image.shape:
             anchors_centers = np.vstack([(anchors[:, 0] + anchors[:, 2]) / 2, (anchors[:, 1] + anchors[:, 3]) / 2]).T
-            indices = np.logical_or(anchors_centers[:, 0] >= image[0].shape[1], anchors_centers[:, 1] >= image[0].shape[0])
+            indices = np.logical_or(anchors_centers[:, 0] >= image.shape[1], anchors_centers[:, 1] >= image.shape[0])
 
             labels_batch[index, indices, -1]     = -1
             #regression_batch[index, indices, -1] = -1
@@ -299,7 +299,7 @@ def anchor_targets_bbox(
     #print(labels_batch.shape)
     #print(mask_batch.shape)
     #print(DR_diff_box[:batch_size, :, :].shape)
-    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch)#, tf.convert_to_tensor(DR_diff_box[:batch_size, :, :])#, tf.convert_to_tensor(valid)
+    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch), tf.convert_to_tensor(regression_3D)
 
 
 def compute_gt_annotations(
