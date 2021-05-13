@@ -45,7 +45,11 @@ class CustomModel(tf.keras.Model):
         # labels += 0.05 * tf.random.uniform(tf.shape(labels))
         #x_st = tf.concat([x_s, x_t], axis=0)
 
-        with tf.GradientTape(persistent=True) as tape:
+        #print('pyrapose.py::discriminator')
+        #for layer in self.discriminator.layers:
+        #    print(layer.name, layer.trainable)
+
+        with tf.GradientTape() as tape:
             predicts_gen = self.pyrapose(x_s)
             for ldx, loss_func in enumerate(self.loss_generator):
                 #print(loss_func)
@@ -59,7 +63,7 @@ class CustomModel(tf.keras.Model):
 
         # compute gradients of pyrapose with discriminator frozen
         grads_gen = tape.gradient(loss_sum, self.pyrapose.trainable_weights)
-        #self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
+        self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
 
         predicts_target = self.pyrapose(x_t)
         target_points = predicts_target[0]
@@ -149,8 +153,8 @@ class CustomModel(tf.keras.Model):
         '''
         dis_real = []
         dis_fake = []
-        # with tf.GradientTape() as tape:
-        with tape:
+        with tf.GradientTape() as tape:
+        #with tape:
             for ddx, disc_map in enumerate(disc_patch_real):
                 domain = self.discriminator(disc_map)
                 domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
@@ -173,7 +177,7 @@ class CustomModel(tf.keras.Model):
 
         self.optimizer_discriminator.apply_gradients(zip(grads_dis, self.discriminator.trainable_weights))
 
-        self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
+        #self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
 
         del tape
 

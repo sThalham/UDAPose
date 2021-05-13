@@ -363,6 +363,9 @@ def retinanet(
     discriminator_head = default_discriminator(num_classes)
 
     discriminator_head.trainable = False
+    print('retinanet.py::model+discriminator')
+    for layer in discriminator_head.layers:
+        print(layer.name, layer.trainable)
 
     b1, b2, b3 = backbone_layers
 
@@ -392,8 +395,10 @@ def retinanet(
     domainP5 = discriminator_head(disc_P5)
     domain = keras.layers.Concatenate(axis=1, name='domain')([domainP3, domainP4, domainP5])
 
-    # discriminator conditioned on P3 feature classification
-    #domain = discriminator_head(features[0])
+    discriminator_head.trainable = True
+    print('retinanet.py::discriminator')
+    for layer in discriminator_head.layers:
+        print(layer.name, layer.trainable)
 
     pyramids.append(domain)
     pyramids.append(features[0])
