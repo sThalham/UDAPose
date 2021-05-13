@@ -7,15 +7,13 @@ from . import assert_training_model
 
 
 class CustomModel(tf.keras.Model):
-    def __init__(self, pyrapose, disc_model, discriminator):
+    def __init__(self, pyrapose, discriminator):
         super(CustomModel, self).__init__()
         self.discriminator = discriminator
         self.pyrapose = pyrapose
-        self.model_disc = disc_model
 
     def compile(self, gen_optimizer, dis_optimizer, gen_loss, dis_loss, **kwargs):
-        self.model_disc.get_layer('disc').trainable = False
-        self.model_disc.get_layer('disc_').trainable = False
+
         super(CustomModel, self).compile(**kwargs)
         self.optimizer_generator = gen_optimizer
         self.optimizer_discriminator = dis_optimizer
@@ -23,7 +21,7 @@ class CustomModel(tf.keras.Model):
         self.loss_discriminator = dis_loss
         #self.pyrapose.get_layer('disc').trainable = False
         #self.pyrapose.get_layer('disc_').trainable = False
-        #for layer in self.pyrapose.get_layer('disc_').layers:
+        #for layer in self.model_disc.get_layer('disc_').layers:
         #    print(layer.name, layer.trainable)
 
     #@tf.function
@@ -56,18 +54,72 @@ class CustomModel(tf.keras.Model):
         #    print(layer.name, layer.trainable)
 
         with tf.GradientTape(persistent=True) as tape:
-            predicts_gen = self.pyrapose(x_s)
+            predicts_source = self.pyrapose(x_s)
             for ldx, loss_func in enumerate(self.loss_generator):
-                print(loss_func)
+                #print(loss_func)
                 loss_names.append(loss_func)
                 y_now = tf.convert_to_tensor(y_s[ldx], dtype=tf.float32)
                 #print(keras.backend.int_shape(y_s[ldx]))
                 #print(keras.backend.int_shape(predicts_gen[ldx]))
-                loss = self.loss_generator[loss_func](y_now, predicts_gen[ldx])
+                loss = self.loss_generator[loss_func](y_now, predicts_source[ldx])
                 losses.append(loss)
                 loss_sum += loss
 
-            predicts_dis = self.model_disc(x_s)
+        source_points = predicts_source[0]
+        locations = predicts_source[1]
+        masks = predicts_source[2]
+        source_featuresP3 = predicts_source[3]
+        source_featuresP4 = predicts_source[4]
+        source_featuresP5 = predicts_source[5]
+
+        predicts_target = self.pyrapose(x_t)
+        target_points = predicts_target[0]
+        target_locations = predicts_target[1]
+        masks = predicts_gen[2]
+        target_featuresP3 = predicts_target[3]
+        target_featuresP4 = predicts_target[4]
+        target_featuresP5 = predicts_target[5]
+
+        source = tf.zeros((batch_size, 56700, 1))
+        target = tf.ones((batch_size, 56700, 1))
+
+        target_locations_red = tf.math.reduce_max(target_locations, axis=2, keepdims=False,
+                                                  name=None)  # find max value along cls dimension
+        sst_temp = tf.math.reduce_max(tf.math.reduce_max(target_locations_red, axis=1, keepdims=False, name=None),
+                                      axis=0, keepdims=False, name=None) * 0.8
+        lr_scale = tf.cast(tf.cast(sst_temp, dtype=tf.int32), dtype=tf.float32)  # gatekeeping at its finest
+        #tf.print(' ')
+        #tf.print(sst_temp, lr_scale)
+        # tf.print(tf.math.reduce_sum(target_locations_red))
+        target_locations_red = tf.expand_dims(target_locations_red, axis=2)
+        # print(target_locations_red)
+        real_pseudo_anno_cls = tf.math.greater(target_locations_red, sst_temp * 0.8)
+        # tf.print(real_pseudo_anno_cls)
+        self_anno = tf.ones((batch_size, 56700, 1))
+        # tf.print(tf.math.reduce_sum(real_anno))
+        self_anno = self_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
+
+        source_anno = y_s[0][:, :, -1]
+        source_anno = tf.expand_dims(source_anno, axis=2)
+        source_targets_dis = tf.concat([source, source_anno], axis=2)
+        fake_targets_dis = tf.concat([target, self_anno], axis=2)
+        target_targets_dis = tf.concat([target, source_anno], axis=2)
+
+        source_pointsP3, source_pointsP4, source_pointsP5 = tf.split(source_points,
+                                                                     num_or_size_splits=[43200, 10800, 2700], axis=1)
+        source_pointsP3_re = tf.reshape(source_pointsP3, (batch_size, 60, 80, 9 * 16))
+        source_pointsP4_re = tf.reshape(source_pointsP4, (batch_size, 30, 40, 9 * 16))
+        source_pointsP5_re = tf.reshape(source_pointsP5, (batch_size, 15, 20, 9 * 16))
+
+        source_patchP3 = tf.concat([source_featuresP3, source_pointsP3_re], axis=3)
+        source_patchP4 = tf.concat([source_featuresP4, source_pointsP4_re], axis=3)
+        source_patchP5 = tf.concat([source_featuresP5, source_pointsP5_re], axis=3)
+
+        with tape:
+            fake_discrimination = self.discriminator()
+
+        '''
+            predicts_source = self.model_disc(x_s)
             loss_names.append('domain')
             y_now = tf.convert_to_tensor(y_s[3], dtype=tf.float32)
             # print(keras.backend.int_shape(y_s[ldx]))
@@ -75,6 +127,7 @@ class CustomModel(tf.keras.Model):
             loss = self.loss_discriminator(y_now, predicts_dis)
             losses.append(loss)
             loss_sum += loss
+        '''
 
         # compute gradients of pyrapose with discriminator frozen
         grads_gen = tape.gradient(loss_sum, self.pyrapose.trainable_weights)
@@ -89,19 +142,10 @@ class CustomModel(tf.keras.Model):
         target_featuresP4 = predicts_target[4]
         target_featuresP5 = predicts_target[5]
 
-        source_points = predicts_gen[0]
-        locations = predicts_gen[1]
-        masks = predicts_gen[2]
-        #domain = predicts_gen[3]
-        source_featuresP3 = predicts_gen[3]
-        source_featuresP4 = predicts_gen[4]
-        source_featuresP5 = predicts_gen[5]
+
 
         # discriminator for feature map conditioned on predicted pose
-        source_pointsP3, source_pointsP4, source_pointsP5 = tf.split(source_points, num_or_size_splits=[43200, 10800, 2700], axis=1)
-        source_pointsP3_re = tf.reshape(source_pointsP3, (batch_size, 60, 80, 9 * 16))
-        source_pointsP4_re = tf.reshape(source_pointsP4, (batch_size, 30, 40, 9 * 16))
-        source_pointsP5_re = tf.reshape(source_pointsP5, (batch_size, 15, 20, 9 * 16))
+
 
         target_pointsP3, target_pointsP4, target_pointsP5 = tf.split(target_points, num_or_size_splits=[43200, 10800, 2700], axis=1)
         target_pointsP3_re = tf.reshape(target_pointsP3, (batch_size, 60, 80, 9 * 16))
@@ -153,6 +197,7 @@ class CustomModel(tf.keras.Model):
         #disc_labels = tf.concat([real_targets_dis, fake_targets_dis], axis=0)
         #print('disc_labels: ', disc_labels)
 
+
         dis_real = []
         dis_fake = []
         #with tf.GradientTape() as tape:
@@ -178,6 +223,7 @@ class CustomModel(tf.keras.Model):
         grads_dis = tape.gradient(loss_d, self.discriminator.trainable_weights)
 
         self.optimizer_discriminator.apply_gradients(zip(grads_dis, self.discriminator.trainable_weights))
+
 
         self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
         self.optimizer_discriminator.apply_gradients(zip(grads_gen, self.model_disc.trainable_weights))

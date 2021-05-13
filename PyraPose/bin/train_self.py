@@ -88,15 +88,15 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
         #from keras.utils import multi_gpu_model
         from tensorflow.keras.utils import multi_gpu_model
         with tf.device('/cpu:0'):
-            model, model_and_disc, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+            model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
         training_model = multi_gpu_model(model, gpus=multi_gpu)
     else:
-        model, model_and_disc, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+        model, discriminator_model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
         training_model = model
 
     prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
 
-    gan = CustomModel(pyrapose=training_model, disc_model=model_and_disc, discriminator=discriminator_model)
+    gan = CustomModel(pyrapose=training_model, discriminator=discriminator_model)
     #optimizer_adam = tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001)
     gan.compile(
         gen_optimizer=tf.keras.optimizers.Adam(lr=lr, clipnorm=0.001),
