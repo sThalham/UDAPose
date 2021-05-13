@@ -122,7 +122,7 @@ class CustomModel(tf.keras.Model):
         #tf.print(tf.math.reduce_sum(target_locations_red))
         target_locations_red = tf.expand_dims(target_locations_red, axis=2)
         #print(target_locations_red)
-        real_pseudo_anno_cls = tf.math.greater(target_locations_red, 0.5)
+        real_pseudo_anno_cls = tf.math.greater(target_locations_red, sst_temp*0.8)
         #tf.print(real_pseudo_anno_cls)
         real_anno = tf.ones((batch_size, 56700, 1))
         #tf.print(tf.math.reduce_sum(real_anno))
@@ -160,7 +160,7 @@ class CustomModel(tf.keras.Model):
                 domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
                 dis_real.append(domain)
             disc_real = tf.concat([dis_real[0], dis_real[1], dis_real[2]], axis=1)
-            loss_real = self.loss_discriminator(real_anno, disc_real)
+            loss_real = self.loss_discriminator(real_targets_dis, disc_real)
 
             for ddx, disc_map in enumerate(disc_patch_fake):
                 domain = self.discriminator(disc_map)
@@ -168,8 +168,8 @@ class CustomModel(tf.keras.Model):
                 domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
                 dis_fake.append(domain)
             disc_fake = tf.concat([dis_fake[0], dis_fake[1], dis_fake[2]], axis=1)
-            loss_fake = self.loss_discriminator(fake_anno, disc_fake)
-            loss_d = lr_scale * (loss_real + loss_fake)
+            loss_fake = self.loss_discriminator(fake_targets_dis, disc_fake)
+            loss_d = loss_real + loss_fake
 
         #tf.print(loss_d)
 
