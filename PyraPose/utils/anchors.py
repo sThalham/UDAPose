@@ -115,7 +115,7 @@ def anchor_targets_bbox(
     #reconstruction_batch = np.zeros((batch_size, 60, 80, 3 + 1), dtype=keras.backend.floatx())
     #valid = np.ones((batch_size, 20, 2), dtype=keras.backend.floatx())
     #valid = np.ones((batch_size, 60, 80, 2), dtype=keras.backend.floatx())
-    valid = np.ones((batch_size, anchors.shape[0], 1 + 1), dtype=keras.backend.floatx())
+    #valid = np.ones((batch_size, anchors.shape[0], 1 + 1), dtype=keras.backend.floatx())
 
     #P3 = np.zeros((batch_size, 4800, 257), dtype=keras.backend.floatx())
 
@@ -152,8 +152,8 @@ def anchor_targets_bbox(
             regression_3D[index, ignore_indices, -1] = -1
             regression_3D[index, positive_indices, -1] = 1
 
-            valid[index, ignore_indices, -1] = -1
-            valid[index, positive_indices, -1] = 1
+            #valid[index, ignore_indices, -1] = -1
+            #valid[index, positive_indices, -1] = 1
 
             # compute target class labels
             labels_batch[index, positive_indices, annotations['labels'][argmax_overlaps_inds[positive_indices]].astype(int)] = 1
@@ -280,12 +280,12 @@ def anchor_targets_bbox(
             labels_batch[index, indices, -1]     = -1
             #regression_batch[index, indices, -1] = -1
             regression_3D[index, indices, -1] = -1
-            valid[index, indices, -1] = -1
+            #valid[index, indices, -1] = -1
             #labels_batch_target[index, indices, -1] = -1
             #regression_3D_target[index, indices, -1] = -1
 
     #return regression_3D, labels_batch, mask_batch, valid
-    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch), tf.convert_to_tensor(valid)
+    return tf.convert_to_tensor(regression_3D), tf.convert_to_tensor(labels_batch), tf.convert_to_tensor(mask_batch)#, tf.convert_to_tensor(valid)
 
 
 def compute_gt_annotations(

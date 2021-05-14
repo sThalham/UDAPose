@@ -250,7 +250,7 @@ def smooth_l1_pose(sigma=3.0):
     return _smooth_l1_pose
 
 
-def weighted_mse(weight=5.0):
+def weighted_mse(weight=2.5):
 
     def _wMSE(y_true, y_pred):
 
@@ -268,7 +268,7 @@ def weighted_mse(weight=5.0):
         #### compute the normalizer: the number of positive anchors
         normalizer = keras.backend.maximum(1, keras.backend.shape(indices)[0])
         normalizer = keras.backend.cast(normalizer, dtype=keras.backend.floatx())
-        return weight * keras.backend.sum(regression_loss) / normalizer
+        return weight * keras.backend.sum(regression_loss) / normalizer#
 
     return _wMSE
 

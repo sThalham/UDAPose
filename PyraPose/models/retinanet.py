@@ -34,6 +34,7 @@ def default_classification_model(
             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
             #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
             bias_initializer='zeros',
+            name='cls_' + str(i),
             **options
         )(outputs)
 
@@ -42,6 +43,7 @@ def default_classification_model(
         #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
         kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
         bias_initializer=initializers.PriorProbability(probability=prior_probability),
+        name='cls_final',
         **options
     )(outputs)
 
@@ -80,6 +82,7 @@ def default_mask_model(
             #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
             kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
             bias_initializer='zeros',
+            name='mask_' + str(i),
             **options
         )(outputs)
 
@@ -88,6 +91,7 @@ def default_mask_model(
         #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
         kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
         bias_initializer=initializers.PriorProbability(probability=prior_probability),
+        name='mask_final',
         **options
     )(outputs)
 
@@ -158,9 +162,9 @@ def default_discriminator(
         outputs = keras.layers.Conv2D(
             filters=classification_feature_size,
             activation='relu',
-            kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
+            #kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
             #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
-            bias_initializer='zeros',
+            #bias_initializer='zeros',
             name='disc_' + str(i),
             **options
         )(outputs)
@@ -168,8 +172,8 @@ def default_discriminator(
     outputs = keras.layers.Conv2D(
         filters=9,
         #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
-        kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
-        bias_initializer=initializers.PriorProbability(probability=prior_probability),
+        #kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
+        #bias_initializer=initializers.PriorProbability(probability=prior_probability),
         name='disc_final',
         **options
 
@@ -180,7 +184,7 @@ def default_discriminator(
         outputs = keras.layers.Permute((2, 3, 1))(outputs) #, name='pyramid_classification_permute'
     #outputs = keras.layers.Reshape((60, 80, 1))(outputs) # , name='pyramid_classification_reshape'
     outputs = keras.layers.Reshape((-1, 1))(outputs)
-    outputs = keras.layers.Activation('sigmoid')(outputs) # , name='pyramid_classification_sigmoid'
+    #outputs = keras.layers.Activation('sigmoid')(outputs) # , name='pyramid_classification_sigmoid'
 
     #outputs = keras.backend.print_tensor(outputs, message='domain')
 
@@ -362,6 +366,7 @@ def retinanet(
     #domain = keras.layers.Concatenate(axis=1, name='disc')([domainP3, domainP4, domainP5])
 
     #pyramids.append(domain)
+    # need pyramids for conditional adversarial training
     pyramids.append(features[0])
     pyramids.append(features[1])
     pyramids.append(features[2])
