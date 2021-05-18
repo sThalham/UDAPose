@@ -14,6 +14,7 @@ class CustomModel(tf.keras.Model):
 
         self.exp_mvg_avg = tf.Variable(0.0)
         self.lr_scale = tf.Variable(0.0)
+        self.bal = tf.Variable(1.0)
 
     def compile(self, gen_optimizer, dis_optimizer, gen_loss, dis_loss, **kwargs):
 
@@ -181,7 +182,15 @@ class CustomModel(tf.keras.Model):
                 dis_source.append(domain)
             disc_source = tf.concat([dis_source[0], dis_source[1], dis_source[2]], axis=1)
             loss_source = self.loss_discriminator(source_targets_dis, disc_source)
-            loss_d = self.lr_scale * (loss_target + loss_source)
+
+            balance = self.bal
+            balance = balance + 0.1 * (loss_source - loss_target)
+            balance = tf.cond(self.lr_scale > 0.0, lambda: balance, lambda: self.return_1())
+            self.bal.assign(balance)
+
+            tf.print(loss_source, loss_target, balance)
+
+            loss_d = self.lr_scale * (balance * loss_target + loss_source)
 
         #tf.print(loss_d)
 
@@ -194,7 +203,6 @@ class CustomModel(tf.keras.Model):
             if grad is not None
         ) # to suppress warning because of not updating cls and mask
         self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
-
 
         #self.optimizer_generator.apply_gradients(zip(grads_gen, self.pyrapose.trainable_weights))
         #self.optimizer_discriminator.apply_gradients(zip(grads_gen, self.model_disc.trainable_weights))
