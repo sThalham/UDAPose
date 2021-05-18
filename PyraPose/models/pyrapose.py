@@ -12,6 +12,9 @@ class CustomModel(tf.keras.Model):
         self.discriminator = discriminator
         self.pyrapose = pyrapose
 
+        self.exp_mvg_avg = tf.Variable(0.0)
+        self.lr_scale = tf.Variable(0.0)
+
     def compile(self, gen_optimizer, dis_optimizer, gen_loss, dis_loss, **kwargs):
 
         super(CustomModel, self).compile(**kwargs)
@@ -24,13 +27,22 @@ class CustomModel(tf.keras.Model):
         #for layer in self.discriminator.layers:
         #    print(layer.name, layer.weights)
 
+    def set_lr_scale(self):
+        self.lr_scale = 1.0
+
+    def set_exp_mvg_avg(self, val):
+        self.exp_mvg_avg = val
+
+    def do_not_set_lr_scale(self):
+        self.lr_scale = 0.0
+
     def return_1(self):
         return 1.0
 
     def return_0(self):
         return 0.0
 
-    #@tf.function
+    @tf.function
     def train_step(self, data):
 
         #x_s = data[0]['x']
@@ -67,12 +79,17 @@ class CustomModel(tf.keras.Model):
         target_locations_red = tf.math.reduce_max(target_locations, axis=2, keepdims=False,
                                                   name=None)  # find max value along cls dimension
         sst_temp = tf.math.reduce_max(tf.math.reduce_max(target_locations_red, axis=1, keepdims=False, name=None),
-                                      axis=0, keepdims=False, name=None) * 0.8
-        #lr_scale = tf.cast(sst_temp, dtype=tf.int32)  # gatekeeping at its finest
-        lr_scale = tf.cond(sst_temp > 0.5, lambda: self.return_1(), lambda: self.return_0())
-        #tf.print('sst_temp: ', sst_temp, lr_scale)
+                                      axis=0, keepdims=False, name=None)# * 0.8
+
+        exp_mvg_avg = self.exp_mvg_avg
+        exp_mvg_avg = 0.99 * exp_mvg_avg + 0.01 * sst_temp
+        self.exp_mvg_avg.assign(exp_mvg_avg)
+
+        lr_scale = tf.cond(self.exp_mvg_avg > 0.5, lambda: self.return_1(), lambda: self.return_0())
+        self.lr_scale.assign(lr_scale)
+        #tf.print('sst_temp/mvg_avg/lr_scale: ', sst_temp, exp_mvg_avg, lr_scale)
         target_locations_red = tf.expand_dims(target_locations_red, axis=2)
-        real_pseudo_anno_cls = tf.math.greater(target_locations_red, sst_temp * 0.8)
+        real_pseudo_anno_cls = tf.math.greater(target_locations_red, 0.5)
         self_anno = tf.ones((batch_size, 56700, 1))
         self_anno = self_anno * tf.cast(real_pseudo_anno_cls, dtype=tf.float32)
         target_targets_dis = tf.concat([target_domain, self_anno], axis=2)
@@ -106,7 +123,8 @@ class CustomModel(tf.keras.Model):
             # track gradient
             source_points = predicts_source[0]
             #locations = predicts_source[1]
-            #masks = predicts_source[2]
+            #masks = predicts_source[2]+
+
             source_featuresP3 = predicts_source[3]
             source_featuresP4 = predicts_source[4]
             source_featuresP5 = predicts_source[5]
@@ -124,6 +142,9 @@ class CustomModel(tf.keras.Model):
 
             source_patches = [source_patchP3, source_patchP4, source_patchP5]
 
+            #lr_scale = tf.cond(losses[1] < 0.2, lambda: self.return_1(), lambda: self.return_0())
+            #tf.print(losses[1], lr_scale)
+
             for ddx, disc_map in enumerate(source_patches):
                 source_discrimination = self.discriminator(disc_map)
                 source_discrimination = tf.reshape(source_discrimination,
@@ -132,7 +153,7 @@ class CustomModel(tf.keras.Model):
             disc_fake = tf.concat([dis_fake[0], dis_fake[1], dis_fake[2]], axis=1)
             #tf.print(keras.backend.int_shape(disc_fake))
             #tf.print(keras.backend.int_shape(fake_targets_dis))
-            loss_fake = lr_scale * self.loss_discriminator(fake_targets_dis, disc_fake)
+            loss_fake = self.lr_scale * self.loss_discriminator(fake_targets_dis, disc_fake)
             #tf.print(keras.backend.int_shape(loss_fake))
             loss_names.append('domain')
             losses.append(loss_fake)
@@ -160,7 +181,7 @@ class CustomModel(tf.keras.Model):
                 dis_source.append(domain)
             disc_source = tf.concat([dis_source[0], dis_source[1], dis_source[2]], axis=1)
             loss_source = self.loss_discriminator(source_targets_dis, disc_source)
-            loss_d = lr_scale * (loss_target + loss_source)
+            loss_d = self.lr_scale * (loss_target + loss_source)
 
         #tf.print(loss_d)
 

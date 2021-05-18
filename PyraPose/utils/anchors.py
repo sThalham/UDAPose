@@ -119,6 +119,7 @@ def anchor_targets_bbox(
 
     #P3 = np.zeros((batch_size, 4800, 257), dtype=keras.backend.floatx())
 
+
     pyramid_levels = [3]
 
     # compute labels and regression targets
