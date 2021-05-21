@@ -70,7 +70,6 @@ class CustomModel(tf.keras.Model):
         #tf.print(keras.backend.int_shape(source_targets_dis))
         #tf.print(keras.backend.int_shape(fake_targets_dis))
 
-        '''
         predicts_target = self.pyrapose(x_t)
         target_points = predicts_target[0]
         target_locations = predicts_target[1]
@@ -108,24 +107,23 @@ class CustomModel(tf.keras.Model):
         target_patchP5 = tf.concat([target_featuresP5, target_pointsP5_re], axis=3)
 
         target_patches = [target_patchP3, target_patchP4, target_patchP5]
-        '''
 
         dis_fake = []
 
-        inputs = tf.concat([x_s, x_t], axis=0)
+        #inputs = tf.concat([x_s, x_t], axis=0)
 
         with tf.GradientTape(persistent=True) as tape:
-            #predicts_source = self.pyrapose(x_s)
-            predicts = self.pyrapose(inputs)
+            predicts_source = self.pyrapose(x_s)
+            #predicts = self.pyrapose(inputs)
 
-            source_points, target_points = tf.split(predicts[0], num_or_size_splits=2, axis=0)
-            source_locations, target_locations = tf.split(predicts[1], num_or_size_splits=2, axis=0)
-            source_masks, target_masks = tf.split(predicts[2], num_or_size_splits=2, axis=0)
-            source_featuresP3, target_featuresP3 = tf.split(predicts[3], num_or_size_splits=2, axis=0)
-            source_featuresP4, target_featuresP4 = tf.split(predicts[4], num_or_size_splits=2, axis=0)
-            source_featuresP5, target_featuresP5 = tf.split(predicts[5], num_or_size_splits=2, axis=0)
+            #source_points, target_points = tf.split(predicts[0], num_or_size_splits=2, axis=0)
+            #source_locations, target_locations = tf.split(predicts[1], num_or_size_splits=2, axis=0)
+            #source_masks, target_masks = tf.split(predicts[2], num_or_size_splits=2, axis=0)
+            #source_featuresP3, target_featuresP3 = tf.split(predicts[3], num_or_size_splits=2, axis=0)
+            #source_featuresP4, target_featuresP4 = tf.split(predicts[4], num_or_size_splits=2, axis=0)
+            #source_featuresP5, target_featuresP5 = tf.split(predicts[5], num_or_size_splits=2, axis=0)
 
-            predicts_source = [source_points, source_locations, source_masks]
+            #predicts_source = [source_points, source_locations, source_masks]
 
             for ldx, loss_func in enumerate(self.loss_generator):
                 #print(loss_func)
@@ -138,13 +136,13 @@ class CustomModel(tf.keras.Model):
                 loss_sum += loss
 
             # track gradient
-            #source_points = predicts_source[0]
+            source_points = predicts_source[0]
             #locations = predicts_source[1]
-            #masks = predicts_source[2]+
+            #masks = predicts_source[2]
 
-            #source_featuresP3 = predicts_source[3]
-            #source_featuresP4 = predicts_source[4]
-            #source_featuresP5 = predicts_source[5]
+            source_featuresP3 = predicts_source[3]
+            source_featuresP4 = predicts_source[4]
+            source_featuresP5 = predicts_source[5]
 
             source_pointsP3, source_pointsP4, source_pointsP5 = tf.split(source_points,
                                                                          num_or_size_splits=[43200, 10800, 2700],
@@ -176,6 +174,7 @@ class CustomModel(tf.keras.Model):
             losses.append(loss_fake)
             #loss_fake += loss_fake
 
+        '''
         target_locations_red = tf.math.reduce_max(target_locations, axis=2, keepdims=False,
                                                   name=None)  # find max value along cls dimension
         sst_temp = tf.math.reduce_max(tf.math.reduce_max(target_locations_red, axis=1, keepdims=False, name=None),
@@ -204,13 +203,14 @@ class CustomModel(tf.keras.Model):
         target_patchP4 = tf.concat([target_featuresP4, target_pointsP4_re], axis=3)
         target_patchP5 = tf.concat([target_featuresP5, target_pointsP5_re], axis=3)
 
-        patchP3 = tf.concat([source_patchP3, target_patchP3], axis=0)
-        patchP4 = tf.concat([source_patchP4, target_patchP4], axis=0)
-        patchP5 = tf.concat([source_patchP5, target_patchP5], axis=0)
+        #patchP3 = tf.concat([source_patchP3, target_patchP3], axis=0)
+        #patchP4 = tf.concat([source_patchP4, target_patchP4], axis=0)
+        #patchP5 = tf.concat([source_patchP5, target_patchP5], axis=0)
 
-        disc_patches = [patchP3, patchP4, patchP5]
+        #disc_patches = [patchP3, patchP4, patchP5]
 
         #target_patches = [target_patchP3, target_patchP4, target_patchP5]
+        '''
 
         grads_fake = tape.gradient(loss_fake, self.pyrapose.trainable_weights)
         grads_gen = tape.gradient(loss_sum, self.pyrapose.trainable_weights)
@@ -220,25 +220,25 @@ class CustomModel(tf.keras.Model):
 
         #with tf.GradientTape() as tape:
         with tape:
-            for ddx, disc_map in enumerate(disc_patches):
-                domain = self.discriminator(disc_map)
-                domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
-                source_domain, target_domain = tf.split(domain, num_or_size_splits=2, axis=0)
-                dis_source.append(source_domain)
-                dis_target.append(target_domain)
-
-            #for ddx, disc_map in enumerate(target_patches):
+            #for ddx, disc_map in enumerate(disc_patches):
             #    domain = self.discriminator(disc_map)
-            #    domain = tf.reshape(domain, (batch_size, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
-            #    dis_target.append(domain)
+            #    domain = tf.reshape(domain, (batch_size * 2, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
+            #    source_domain, target_domain = tf.split(domain, num_or_size_splits=2, axis=0)
+            #    dis_source.append(source_domain)
+            #    dis_target.append(target_domain)
+
+            for ddx, disc_map in enumerate(target_patches):
+                domain = self.discriminator(disc_map)
+                domain = tf.reshape(domain, (batch_size, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
+                dis_target.append(domain)
             disc_target = tf.concat([dis_target[0], dis_target[1], dis_target[2]], axis=1)
             loss_target = self.loss_discriminator(target_targets_dis, disc_target)
 
-            #for ddx, disc_map in enumerate(source_patches):
-            #    domain = self.discriminator(disc_map)
+            for ddx, disc_map in enumerate(source_patches):
+                domain = self.discriminator(disc_map)
                 # domain = tf.reshape(domain, (batch_size * 2, keras.backend.int_shape(x_s)[1] * keras.backend.int_shape(x_s)[2], 1))
-            #    domain = tf.reshape(domain, (batch_size, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
-            #    dis_source.append(domain)
+                domain = tf.reshape(domain, (batch_size, disc_reso[ddx][0] * disc_reso[ddx][1] * 9, 1))
+                dis_source.append(domain)
             disc_source = tf.concat([dis_source[0], dis_source[1], dis_source[2]], axis=1)
             loss_source = self.loss_discriminator(source_targets_dis, disc_source)
 
