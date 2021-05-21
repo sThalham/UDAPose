@@ -183,14 +183,15 @@ class CustomModel(tf.keras.Model):
             disc_source = tf.concat([dis_source[0], dis_source[1], dis_source[2]], axis=1)
             loss_source = self.loss_discriminator(source_targets_dis, disc_source)
 
-            balance = self.bal
-            balance = balance + 0.1 * (loss_source - loss_target)
-            balance = tf.cond(self.lr_scale > 0.0, lambda: balance, lambda: self.return_1())
-            self.bal.assign(balance)
+            source_scale = loss_target / loss_source
+            source_scale = tf.cond(source_scale > 1.0, lambda: self.return_1(), lambda: source_scale)
 
-            tf.print(loss_source, loss_target, balance)
+            target_scale = loss_source / loss_target
+            target_scale = tf.cond(target_scale > 1.0, lambda: self.return_1(), lambda: target_scale)
 
-            loss_d = self.lr_scale * (balance * loss_target + loss_source)
+            tf.print(target_scale * loss_source, source_scale * loss_target)
+
+            loss_d = self.lr_scale * (target_scale * loss_target + source_scale * loss_source)
 
         #tf.print(loss_d)
 
