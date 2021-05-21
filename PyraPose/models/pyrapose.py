@@ -14,7 +14,8 @@ class CustomModel(tf.keras.Model):
 
         self.exp_mvg_avg = tf.Variable(0.0)
         self.lr_scale = tf.Variable(0.0)
-        self.bal = tf.Variable(1.0)
+        self.source_scale = tf.Variable(1.0)
+        self.target_scale = tf.Variable(1.0)
 
     def compile(self, gen_optimizer, dis_optimizer, gen_loss, dis_loss, **kwargs):
 
@@ -183,15 +184,15 @@ class CustomModel(tf.keras.Model):
             disc_source = tf.concat([dis_source[0], dis_source[1], dis_source[2]], axis=1)
             loss_source = self.loss_discriminator(source_targets_dis, disc_source)
 
-            source_scale = loss_target / loss_source
-            source_scale = tf.cond(source_scale > 1.0, lambda: self.return_1(), lambda: source_scale)
+            self.source_scale.assign(loss_target / loss_source)
+            source_scale_trunc = tf.cond(self.source_scale > 1.0, lambda: self.return_1(), lambda: self.source_scale)
 
-            target_scale = loss_source / loss_target
-            target_scale = tf.cond(target_scale > 1.0, lambda: self.return_1(), lambda: target_scale)
+            self.target_scale.assign(loss_source / loss_target)
+            target_scale_trunc = tf.cond(self.target_scale > 1.0, lambda: self.return_1(), lambda: self.target_scale)
 
-            tf.print(target_scale * loss_source, source_scale * loss_target)
+            tf.print(target_scale_trunc * loss_source, source_scale_trunc * loss_target)
 
-            loss_d = self.lr_scale * (target_scale * loss_target + source_scale * loss_source)
+            loss_d = self.lr_scale * (target_scale_trunc * loss_target + source_scale_trunc * loss_source)
 
         #tf.print(loss_d)
 
