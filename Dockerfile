@@ -54,10 +54,10 @@ RUN pip3 install pygeometry
 RUN pip3 install PyOpenGL
 RUN pip3 install imgaug
 
-RUN git clone https://github.com/sThalham/PyraPose.git /PyraPose
+RUN git clone https://github.com/sThalham/UDAPose.git /UDAPose
 
 # Go to pix2pix root
-WORKDIR /PyraPose
+WORKDIR /UDAPose
 
 
 #CMD ["python3", "RetinaNetPose/bin/train.py", "linemod", "data"]
