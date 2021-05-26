@@ -151,10 +151,10 @@ def default_discriminator(
     }
 
     if keras.backend.image_data_format() == 'channels_first':
-        inputs = keras.layers.Input(shape=(pyramid_feature_size + num_classes, None, None))
+        inputs = keras.layers.Input(shape=(pyramid_feature_size, None, None))
         #inputs = keras.layers.Input(shape=(pyramid_feature_size, None, None))
     else:
-        inputs = keras.layers.Input(shape=(None, None, pyramid_feature_size + 16 * 9))
+        inputs = keras.layers.Input(shape=(None, None, pyramid_feature_size))
         #inputs = keras.layers.Input(shape=(60, 80, pyramid_feature_size))
 
     outputs = inputs
@@ -170,7 +170,7 @@ def default_discriminator(
         )(outputs)
 
     outputs = keras.layers.Conv2D(
-        filters=9,
+        filters=1,
         #kernel_initializer=keras.initializers.normal(mean=0.0, stddev=0.01, seed=None),
         #kernel_initializer=keras.initializers.RandomNormal(mean=0.0, stddev=0.01, seed=None),
         #bias_initializer=initializers.PriorProbability(probability=prior_probability),
